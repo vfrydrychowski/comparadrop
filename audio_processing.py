@@ -27,8 +27,8 @@ def get_hybrid_score(
             return y[onset_sample:]
         return y
 
-    y1 = align_on_onset(y1, sr1)
-    y2 = align_on_onset(y2, sr2)
+    # y1 = align_on_onset(y1, sr1)
+    # y2 = align_on_onset(y2, sr2)
 
     # --- 3. Ajustement de longueur ---
     min_len = min(len(y1), len(y2))
@@ -56,50 +56,28 @@ def get_hybrid_score(
 
     # --- PARTIE B : SIMILARITÉ D’ENVELOPPE LUFS ---
 
-    def get_lufs_envelope(y, sr, window_s=0.4, hop_s=0.2):
-        """Calculates the loudness (LUFS) envelope of an audio signal.
-
-        This function computes the integrated loudness over a sliding window
-        to create a representation of the signal's dynamics.
-
-        Args:
-            y (np.ndarray): The input audio time series.
-            sr (int): The sample rate of the audio time series.
-            window_s (float, optional): The length of the analysis window in seconds.
-                Defaults to 0.4.
-            hop_s (float, optional): The step size between windows in seconds.
-                Defaults to 0.2.
-
-        Returns:
-            np.ndarray: An array representing the LUFS envelope of the signal.
+    def loudness_similarity(loudness1, loudness2, eps=1e-9):
         """
+        Calcule un score de similarité entre deux valeurs de loudness (LUFS).
+        Le score va de 0 (très différent) à 1 (identique).
+        Les valeurs LUFS sont négatives, mais la logique reste la même.
+        """
+        abs_diff = abs(loudness1 - loudness2)
+        # Utilise la moyenne de la magnitude absolue pour normaliser
+        avg_magnitude = (abs(loudness1) + abs(loudness2)) / 2 + eps
+        normalized_diff = abs_diff / avg_magnitude
+        # np.exp(-x) mappe une différence normalisée [0, inf) vers un score de similarité (0, 1]
+        return np.exp(-normalized_diff)
+
+    def get_lufs_envelope(y, sr):
         meter = pyln.Meter(sr)
-        window_samples = int(window_s * sr)
-        hop_samples = int(hop_s * sr)
-        
-        envelope = []
-        for i in range(0, len(y) - window_samples, hop_samples):
-            window = y[i:i+window_samples]
-            if len(window) < window_samples:
-                continue
-            loudness = meter.integrated_loudness(window)
-            envelope.append(loudness)
-        return np.array(envelope)
+        loudness = meter.integrated_loudness(y)       
+        return loudness
 
     env1 = get_lufs_envelope(y1, sr1)
     env2 = get_lufs_envelope(y2, sr2)
-
-    if len(env1) > 1 and len(env2) > 1:
-        # Ajustement de longueur des enveloppes
-        min_env_len = min(len(env1), len(env2))
-        env1 = env1[:min_env_len]
-        env2 = env2[:min_env_len]
-        score_env = np.corrcoef(env1, env2)[0, 1]
-    else:
-        score_env = 0
-
-    score_env = float(np.clip(score_env, -1, 1))
-    if np.isnan(score_env) or score_env < 0:
+    score_env = loudness_similarity(env1, env2)
+    if np.isnan(score_env):
         score_env = 0.0
 
     # --- SCORE FINAL ---

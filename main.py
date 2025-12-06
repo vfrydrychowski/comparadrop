@@ -23,7 +23,7 @@ def compare_folder(folder_path, weights=(0.6, 0.4)):
         score = get_hybrid_score(
             f1, f2,
             weights=weights,
-            verbose=False
+            verbose=True
         )
         results.append((f1, f2, score["total"]))
 
