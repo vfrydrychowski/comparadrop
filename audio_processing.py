@@ -6,13 +6,34 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 import pyloudnorm as pyln
 
+def _calculate_similarity(val1, val2, eps=1e-9):
+    """
+    Calculates a similarity score between two scalar values.
+    The score ranges from 0 (very different) to 1 (identical).
+    """
+    abs_diff = abs(val1 - val2)
+    # Use the mean of the absolute magnitude to normalize
+    avg_magnitude = (abs(val1) + abs(val2)) / 2 + eps
+    normalized_diff = abs_diff / avg_magnitude
+    # np.exp(-x) maps a normalized difference [0, inf) to a similarity score (0, 1]
+    return np.exp(-normalized_diff)
+
 
 def get_hybrid_score(
-        file1, file2,
-        weights=(0.6, 0.4)
-    ):
-
-    w_spec, w_env = weights
+    file1,
+    file2,
+    weights=None,
+):
+    if weights is None:
+        weights = {
+            "mel_spectrogram": 1,
+            "lufs_envelope": 1,
+            "mfcc": 1,
+            "spectral_centroid": 1,
+            "spectral_flatness": 1,
+            "spectral_contrast": 1,
+            "spectral_bandwidth": 1,
+        }
 
     # --- 1. Chargement ---
     y1, sr1 = librosa.load(file1, sr=None)
@@ -55,19 +76,6 @@ def get_hybrid_score(
 
     # --- PARTIE B : SIMILARITÉ D’ENVELOPPE LUFS ---
 
-    def loudness_similarity(loudness1, loudness2, eps=1e-9):
-        """
-        Calcule un score de similarité entre deux valeurs de loudness (LUFS).
-        Le score va de 0 (très différent) à 1 (identique).
-        Les valeurs LUFS sont négatives, mais la logique reste la même.
-        """
-        abs_diff = abs(loudness1 - loudness2)
-        # Utilise la moyenne de la magnitude absolue pour normaliser
-        avg_magnitude = (abs(loudness1) + abs(loudness2)) / 2 + eps
-        normalized_diff = abs_diff / avg_magnitude
-        # np.exp(-x) mappe une différence normalisée [0, inf) vers un score de similarité (0, 1]
-        return np.exp(-normalized_diff)
-
     def get_lufs_envelope(y, sr):
         meter = pyln.Meter(sr)
         loudness = meter.integrated_loudness(y)       
@@ -75,20 +83,66 @@ def get_hybrid_score(
 
     env1 = get_lufs_envelope(y1, sr1)
     env2 = get_lufs_envelope(y2, sr2)
-    score_env = loudness_similarity(env1, env2)
+    score_env = _calculate_similarity(env1, env2)
     if np.isnan(score_env):
         score_env = 0.0
 
+    # --- PARTIE C : AUTRES MÉTRIQUES SPECTRALES ---
+
+    # MFCC
+    mfcc1 = np.mean(librosa.feature.mfcc(y=y1, sr=sr1), axis=1).reshape(1, -1)
+    mfcc2 = np.mean(librosa.feature.mfcc(y=y2, sr=sr2), axis=1).reshape(1, -1)
+    score_mfcc = float(np.clip(cosine_similarity(mfcc1, mfcc2)[0][0], -1, 1))
+
+    # Spectral Centroid
+    centroid1 = np.mean(librosa.feature.spectral_centroid(y=y1, sr=sr1))
+    centroid2 = np.mean(librosa.feature.spectral_centroid(y=y2, sr=sr2))
+    score_centroid = _calculate_similarity(centroid1, centroid2)
+
+    # Spectral Flatness
+    flatness1 = np.mean(librosa.feature.spectral_flatness(y=y1))
+    flatness2 = np.mean(librosa.feature.spectral_flatness(y=y2))
+    score_flatness = _calculate_similarity(flatness1, flatness2)
+
+    # Spectral Contrast
+    contrast1 = np.mean(librosa.feature.spectral_contrast(y=y1, sr=sr1), axis=1).reshape(1, -1)
+    contrast2 = np.mean(librosa.feature.spectral_contrast(y=y2, sr=sr2), axis=1).reshape(1, -1)
+    score_contrast = float(np.clip(cosine_similarity(contrast1, contrast2)[0][0], -1, 1))
+
+    # Spectral Bandwidth
+    bandwidth1 = np.mean(librosa.feature.spectral_bandwidth(y=y1, sr=sr1))
+    bandwidth2 = np.mean(librosa.feature.spectral_bandwidth(y=y2, sr=sr2))
+    score_bandwidth = _calculate_similarity(bandwidth1, bandwidth2)
+
+    # --- Rassemblement des scores ---
+    scores = {
+        "mel_spectrogram": score_spec,
+        "lufs_envelope": score_env,
+        "mfcc": score_mfcc,
+        "spectral_centroid": score_centroid,
+        "spectral_flatness": score_flatness,
+        "spectral_contrast": score_contrast,
+        "spectral_bandwidth": score_bandwidth,
+    }
+
     # --- SCORE FINAL ---
-    final_score = w_spec * score_spec + w_env * score_env
+    weighted_score_sum = sum(scores[k] * v for k, v in weights.items())
+    weight_sum = sum(weights.values())
+
+    final_score = weighted_score_sum / weight_sum if weight_sum > 0 else 0.0
 
     # Passage en pourcentage
     result = {
-        "total": float(final_score * 100),
-        "detail_spectre": float(score_spec * 100),
-        "detail_enveloppe": float(score_env * 100),
+        "total": round(float(final_score * 100), 2),
+        "details": {
+            key: round(float(value * 100), 2) for key, value in scores.items()
+        }
     }
 
-    print(f"|{os.path.basename(file1)}| VS |{os.path.basename(file2)}| → {result}")
+    details_str = ", ".join(f"{k}: {v:.2f}%" for k, v in result["details"].items())
+    print(
+        f"|{os.path.basename(file1)}| VS |{os.path.basename(file2)}| → "
+        f"Total: {result['total']:.2f}% ({details_str})"
+    )
 
     return result
