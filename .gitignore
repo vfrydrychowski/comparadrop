@@ -1,3 +1,5 @@
 __pycache__/
 *.wav
 *.json
+*.zip
+*test.ipynb

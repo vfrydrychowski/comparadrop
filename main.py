@@ -10,7 +10,7 @@ from audio_processing import get_hybrid_score
 #       COMPARAISON DE TOUS LES FICHIERS D'UN DOSSIER
 # --------------------------------------------------------------
 
-def compare_folder(folder_path, weights=(0.6, 0.4)):
+def compare_folder(folder_path):
 
     files = [os.path.join(folder_path, f)
             for f in os.listdir(folder_path)
@@ -22,11 +22,8 @@ def compare_folder(folder_path, weights=(0.6, 0.4)):
     results = []
     
     for f1, f2 in combinations(files, 2):
-        score = get_hybrid_score(
-            f1, f2,
-            weights=weights,
-        )
-        results.append((f1, f2, score["total"]))
+        score = get_hybrid_score(f1, f2)
+        results.append((f1, f2, score))
 
     # Statistiques
     if not results:
@@ -34,17 +31,17 @@ def compare_folder(folder_path, weights=(0.6, 0.4)):
             "min": None, "max": None, "mean": 0.0, "all_pairs": []
         }
 
-    scores = [r[2] for r in results]
+    scores = [r[2]["total"] for r in results]
     min_pair = results[int(np.argmin(scores))]
     max_pair = results[int(np.argmax(scores))]
     avg_score = np.mean(scores)
 
     # Use os.path.basename to remove folder path from filenames in the output
     summary = {
-        "min": {"files": (os.path.basename(min_pair[0]), os.path.basename(min_pair[1])), "score": min_pair[2]},
-        "max": {"files": (os.path.basename(max_pair[0]), os.path.basename(max_pair[1])), "score": max_pair[2]},
+        "min": {"files": (os.path.basename(min_pair[0]), os.path.basename(min_pair[1])), "score": min_pair[2]["total"]},
+        "max": {"files": (os.path.basename(max_pair[0]), os.path.basename(max_pair[1])), "score": max_pair[2]["total"]},
         "mean": float(avg_score),
-        "all_pairs": [(os.path.basename(r[0]), os.path.basename(r[1]), r[2]) for r in results]
+        "all_pairs": [{"files": (os.path.basename(r[0]), os.path.basename(r[1])), "scores": r[2]} for r in results]
     }
 
     return summary
