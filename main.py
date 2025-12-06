@@ -8,7 +8,7 @@ from audio_processing import get_hybrid_score
 #       COMPARAISON DE TOUS LES FICHIERS D'UN DOSSIER
 # --------------------------------------------------------------
 
-def compare_folder(folder_path, weights=(0.6, 0.4), normalize=False):
+def compare_folder(folder_path, weights=(0.6, 0.4)):
 
     files = [os.path.join(folder_path, f)
             for f in os.listdir(folder_path)
@@ -23,7 +23,6 @@ def compare_folder(folder_path, weights=(0.6, 0.4), normalize=False):
         score = get_hybrid_score(
             f1, f2,
             weights=weights,
-            normalize=normalize,
             verbose=False
         )
         results.append((f1, f2, score["total"]))
@@ -51,13 +50,8 @@ if __name__ == '__main__':
         default="samples/",
         help="Path to the folder containing audio files. Defaults to 'samples/'."
     )
-    parser.add_argument(
-        "--normalize",
-        action='store_true',
-        help="Normalize audio files before comparison."
-    )
     args = parser.parse_args()
 
     # Exemple d’utilisation :
-    summary = compare_folder(args.folder, normalize=args.normalize)
+    summary = compare_folder(args.folder)
     print(summary)

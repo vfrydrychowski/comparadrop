@@ -7,7 +7,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 def get_hybrid_score(
         file1, file2,
         weights=(0.6, 0.4),
-        normalize=False,
         verbose=False
     ):
 
@@ -16,11 +15,6 @@ def get_hybrid_score(
     # --- 1. Chargement ---
     y1, sr1 = librosa.load(file1, sr=None)
     y2, sr2 = librosa.load(file2, sr=None)
-
-    # Normalisation optionnelle
-    if normalize:
-        y1 = y1 / (np.max(np.abs(y1)) + 1e-9)
-        y2 = y2 / (np.max(np.abs(y2)) + 1e-9)
 
     # --- 2. Alignement sur l'attaque ---
     def align_on_onset(y, sr):
