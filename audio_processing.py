@@ -4,6 +4,9 @@ import os
 from sklearn.metrics.pairwise import cosine_similarity
 
 
+import pyloudnorm as pyln
+
+
 def get_hybrid_score(
         file1, file2,
         weights=(0.6, 0.4),
@@ -51,13 +54,46 @@ def get_hybrid_score(
     if np.isnan(score_spec):
         score_spec = 0.0
 
-    # --- PARTIE B : SIMILARITÉ D’ENVELOPPE RMS ---
+    # --- PARTIE B : SIMILARITÉ D’ENVELOPPE LUFS ---
 
-    hop = 512
-    env1 = librosa.feature.rms(y=y1, frame_length=1024, hop_length=hop)[0]
-    env2 = librosa.feature.rms(y=y2, frame_length=1024, hop_length=hop)[0]
+    def get_lufs_envelope(y, sr, window_s=0.4, hop_s=0.2):
+        """Calculates the loudness (LUFS) envelope of an audio signal.
+
+        This function computes the integrated loudness over a sliding window
+        to create a representation of the signal's dynamics.
+
+        Args:
+            y (np.ndarray): The input audio time series.
+            sr (int): The sample rate of the audio time series.
+            window_s (float, optional): The length of the analysis window in seconds.
+                Defaults to 0.4.
+            hop_s (float, optional): The step size between windows in seconds.
+                Defaults to 0.2.
+
+        Returns:
+            np.ndarray: An array representing the LUFS envelope of the signal.
+        """
+        meter = pyln.Meter(sr)
+        window_samples = int(window_s * sr)
+        hop_samples = int(hop_s * sr)
+        
+        envelope = []
+        for i in range(0, len(y) - window_samples, hop_samples):
+            window = y[i:i+window_samples]
+            if len(window) < window_samples:
+                continue
+            loudness = meter.integrated_loudness(window)
+            envelope.append(loudness)
+        return np.array(envelope)
+
+    env1 = get_lufs_envelope(y1, sr1)
+    env2 = get_lufs_envelope(y2, sr2)
 
     if len(env1) > 1 and len(env2) > 1:
+        # Ajustement de longueur des enveloppes
+        min_env_len = min(len(env1), len(env2))
+        env1 = env1[:min_env_len]
+        env2 = env2[:min_env_len]
         score_env = np.corrcoef(env1, env2)[0, 1]
     else:
         score_env = 0
