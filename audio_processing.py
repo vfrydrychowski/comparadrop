@@ -9,8 +9,7 @@ import pyloudnorm as pyln
 
 def get_hybrid_score(
         file1, file2,
-        weights=(0.6, 0.4),
-        verbose=False
+        weights=(0.6, 0.4)
     ):
 
     w_spec, w_env = weights
@@ -90,7 +89,6 @@ def get_hybrid_score(
         "detail_enveloppe": float(score_env * 100),
     }
 
-    if verbose:
-        print(f"{os.path.basename(file1)} vs {os.path.basename(file2)} → {result}")
+    print(f"|{os.path.basename(file1)}| VS |{os.path.basename(file2)}| → {result}")
 
     return result

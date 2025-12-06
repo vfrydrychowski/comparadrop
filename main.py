@@ -1,6 +1,8 @@
 import os
 import numpy as np
 from itertools import combinations
+import json
+from datetime import datetime
 import argparse
 from audio_processing import get_hybrid_score
 
@@ -23,21 +25,26 @@ def compare_folder(folder_path, weights=(0.6, 0.4)):
         score = get_hybrid_score(
             f1, f2,
             weights=weights,
-            verbose=True
         )
         results.append((f1, f2, score["total"]))
 
     # Statistiques
+    if not results:
+        return {
+            "min": None, "max": None, "mean": 0.0, "all_pairs": []
+        }
+
     scores = [r[2] for r in results]
     min_pair = results[int(np.argmin(scores))]
     max_pair = results[int(np.argmax(scores))]
     avg_score = np.mean(scores)
 
+    # Use os.path.basename to remove folder path from filenames in the output
     summary = {
-        "min": {"files": (min_pair[0], min_pair[1]), "score": min_pair[2]},
-        "max": {"files": (max_pair[0], max_pair[1]), "score": max_pair[2]},
+        "min": {"files": (os.path.basename(min_pair[0]), os.path.basename(min_pair[1])), "score": min_pair[2]},
+        "max": {"files": (os.path.basename(max_pair[0]), os.path.basename(max_pair[1])), "score": max_pair[2]},
         "mean": float(avg_score),
-        "all_pairs": results
+        "all_pairs": [(os.path.basename(r[0]), os.path.basename(r[1]), r[2]) for r in results]
     }
 
     return summary
@@ -50,8 +57,24 @@ if __name__ == '__main__':
         default="samples/",
         help="Path to the folder containing audio files. Defaults to 'samples/'."
     )
+    parser.add_argument(
+        "-o", "--output-dir",
+        default=".",
+        help="Directory to save the JSON results file. Defaults to the current directory."
+    )
     args = parser.parse_args()
 
-    # Exemple d’utilisation :
+    # --- 1. Run comparison ---
     summary = compare_folder(args.folder)
-    print(summary)
+
+    # --- 2. Save results to a timestamped JSON file ---
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"comparison_results_{timestamp}.json"
+    output_path = os.path.join(args.output_dir, filename)
+
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(summary, f, indent=4, ensure_ascii=False)
+
+    print(f"Comparison summary saved to: {output_path}")
