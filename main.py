@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from itertools import combinations
+import argparse
 from audio_processing import get_hybrid_score
 
 # --------------------------------------------------------------
@@ -43,6 +44,15 @@ def compare_folder(folder_path, weights=(0.6, 0.4), normalize=False):
     return summary
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Compare audio files in a folder.")
+    parser.add_argument(
+        "folder",
+        nargs="?",
+        default="samples/",
+        help="Path to the folder containing audio files. Defaults to 'samples/'."
+    )
+    args = parser.parse_args()
+
     # Exemple d’utilisation :
-    summary = compare_folder("samples/", normalize=False)
+    summary = compare_folder(args.folder, normalize=False)
     print(summary)
