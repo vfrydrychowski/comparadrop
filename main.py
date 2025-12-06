@@ -51,8 +51,13 @@ if __name__ == '__main__':
         default="samples/",
         help="Path to the folder containing audio files. Defaults to 'samples/'."
     )
+    parser.add_argument(
+        "--normalize",
+        action='store_true',
+        help="Normalize audio files before comparison."
+    )
     args = parser.parse_args()
 
     # Exemple d’utilisation :
-    summary = compare_folder(args.folder, normalize=False)
+    summary = compare_folder(args.folder, normalize=args.normalize)
     print(summary)
