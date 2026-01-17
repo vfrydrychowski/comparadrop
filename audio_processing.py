@@ -69,9 +69,13 @@ def get_hybrid_score(
     S1_db = librosa.power_to_db(S1, ref=np.max)
     S2_db = librosa.power_to_db(S2, ref=np.max)
 
-    # MOYENNE TEMPORELLE pour plus de robustesse
-    S1_vec = np.mean(S1_db, axis=1).reshape(1, -1)
-    S2_vec = np.mean(S2_db, axis=1).reshape(1, -1)
+    # Flatten to preserve temporal structure
+    S1_flat = S1_db.flatten()
+    S2_flat = S2_db.flatten()
+
+    # Center the data (Pearson correlation) to avoid high scores from shared negative dB range
+    S1_vec = (S1_flat - np.mean(S1_flat)).reshape(1, -1)
+    S2_vec = (S2_flat - np.mean(S2_flat)).reshape(1, -1)
 
     score_spec = cosine_similarity(S1_vec, S2_vec)[0][0]
 
