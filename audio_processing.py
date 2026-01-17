@@ -39,6 +39,7 @@ def get_hybrid_score(
     y1, sr1 = librosa.load(file1, sr=None)
     y2, sr2 = librosa.load(file2, sr=None)
 
+
     # --- 2. Alignement sur l'attaque ---
     def align_on_onset(y, sr):
         onset_frames = librosa.onset.onset_detect(y=y, sr=sr, backtrack=True)
@@ -56,9 +57,14 @@ def get_hybrid_score(
     y2 = y2[:min_len]
 
     # --- PARTIE A : SIMILARITÉ SPECTRALE ---
+        # Remove the first 0.03 seconds to ignore the transient
+    attack_seconds = 0.08
+    attack_samples = int(attack_seconds * sr1)
+    y1_mel = y1[attack_samples:]
+    y2_mel = y2[attack_samples:]
 
-    S1 = librosa.feature.melspectrogram(y=y1, sr=sr1, n_mels=128, hop_length=50)
-    S2 = librosa.feature.melspectrogram(y=y2, sr=sr2, n_mels=128, hop_length=50)
+    S1 = librosa.feature.melspectrogram(y=y1_mel, sr=sr1, n_mels=128, hop_length=50)
+    S2 = librosa.feature.melspectrogram(y=y2_mel, sr=sr2, n_mels=128, hop_length=50)
 
     S1_db = librosa.power_to_db(S1, ref=np.max)
     S2_db = librosa.power_to_db(S2, ref=np.max)
