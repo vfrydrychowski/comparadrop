@@ -57,8 +57,8 @@ def get_hybrid_score(
 
     # --- PARTIE A : SIMILARITÉ SPECTRALE ---
 
-    S1 = librosa.feature.melspectrogram(y=y1, sr=sr1, n_mels=128)
-    S2 = librosa.feature.melspectrogram(y=y2, sr=sr2, n_mels=128)
+    S1 = librosa.feature.melspectrogram(y=y1, sr=sr1, n_mels=128, hop_length=50)
+    S2 = librosa.feature.melspectrogram(y=y2, sr=sr2, n_mels=128, hop_length=50)
 
     S1_db = librosa.power_to_db(S1, ref=np.max)
     S2_db = librosa.power_to_db(S2, ref=np.max)
