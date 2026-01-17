@@ -57,8 +57,8 @@ def get_hybrid_score(
     y2 = y2[:min_len]
 
     # --- PARTIE A : SIMILARITÉ SPECTRALE ---
-        # Remove the first 0.03 seconds to ignore the transient
-    attack_seconds = 0.08
+    # Remove the first 0.03 seconds to ignore the transient
+    attack_seconds = 0.03
     attack_samples = int(attack_seconds * sr1)
     y1_mel = y1[attack_samples:]
     y2_mel = y2[attack_samples:]
