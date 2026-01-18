@@ -19,6 +19,36 @@ def _calculate_similarity(val1, val2, eps=1e-9):
     return np.exp(-normalized_diff)
 
 
+def _calculate_mel_similarity(y1, y2, sr1, sr2, n_mels=181, hop_length=801, n_fft=1060):
+    # Remove the first 0.03 seconds to ignore the transient
+    attack_seconds = 0.03
+    attack_samples = int(attack_seconds * sr1)
+    y1_mel = y1[attack_samples:]
+    y2_mel = y2[attack_samples:]
+
+    S1 = librosa.feature.melspectrogram(y=y1_mel, sr=sr1, n_mels=n_mels, hop_length=hop_length, n_fft=n_fft)
+    S2 = librosa.feature.melspectrogram(y=y2_mel, sr=sr2, n_mels=n_mels, hop_length=hop_length, n_fft=n_fft)
+
+    S1_db = librosa.power_to_db(S1, ref=np.max)
+    S2_db = librosa.power_to_db(S2, ref=np.max)
+
+    # Flatten to preserve temporal structure
+    S1_flat = S1_db.flatten()
+    S2_flat = S2_db.flatten()
+
+    # Center the data (Pearson correlation) to avoid high scores from shared negative dB range
+    S1_vec = (S1_flat - np.mean(S1_flat)).reshape(1, -1)
+    S2_vec = (S2_flat - np.mean(S2_flat)).reshape(1, -1)
+
+    score_spec = cosine_similarity(S1_vec, S2_vec)[0][0]
+
+    # Sécurisation des valeurs
+    score_spec = float(np.clip(score_spec, -1, 1))
+    if np.isnan(score_spec):
+        score_spec = 0.0
+    return score_spec
+
+
 def get_hybrid_score(
     file1,
     file2,
@@ -39,6 +69,7 @@ def get_hybrid_score(
     y1, sr1 = librosa.load(file1, sr=None)
     y2, sr2 = librosa.load(file2, sr=None)
 
+
     # --- 2. Alignement sur l'attaque ---
     def align_on_onset(y, sr):
         onset_frames = librosa.onset.onset_detect(y=y, sr=sr, backtrack=True)
@@ -56,23 +87,7 @@ def get_hybrid_score(
     y2 = y2[:min_len]
 
     # --- PARTIE A : SIMILARITÉ SPECTRALE ---
-
-    S1 = librosa.feature.melspectrogram(y=y1, sr=sr1, n_mels=128)
-    S2 = librosa.feature.melspectrogram(y=y2, sr=sr2, n_mels=128)
-
-    S1_db = librosa.power_to_db(S1, ref=np.max)
-    S2_db = librosa.power_to_db(S2, ref=np.max)
-
-    # MOYENNE TEMPORELLE pour plus de robustesse
-    S1_vec = np.mean(S1_db, axis=1).reshape(1, -1)
-    S2_vec = np.mean(S2_db, axis=1).reshape(1, -1)
-
-    score_spec = cosine_similarity(S1_vec, S2_vec)[0][0]
-
-    # Sécurisation des valeurs
-    score_spec = float(np.clip(score_spec, -1, 1))
-    if np.isnan(score_spec):
-        score_spec = 0.0
+    score_spec = _calculate_mel_similarity(y1, y2, sr1, sr2)
 
     # --- PARTIE B : SIMILARITÉ D’ENVELOPPE LUFS ---
 
